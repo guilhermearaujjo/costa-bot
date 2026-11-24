@@ -1,0 +1,20 @@
+{
+  "name": "costa-bot",
+  "version": "1.0.0",
+  "description": "Atendimento automatico de primeiro contato no WhatsApp da Costa & Montenegro, sem LLM.",
+  "main": "src/index.js",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "teste": "node teste/fluxo.test.js",
+    "teste:integracao": "node teste/integracao.test.js"
+  },
+  "dependencies": {
+    "express": "4.21.2",
+    "pg": "8.13.1"
+  }
+}
