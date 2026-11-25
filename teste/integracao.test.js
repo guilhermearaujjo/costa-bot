@@ -12,7 +12,8 @@ const PORTA_EVOLUTION = 4555;
 const PORTA_BOT = 4556;
 const TOKEN = 'tk-teste';
 const ADMIN = 'ad-teste';
-const LINK = 'https://mercadolivre.exemplo/cola';
+const L11 = 'https://ml.exemplo/bastao-11mm';
+const L74 = 'https://ml.exemplo/bastao-74mm';
 
 const DATABASE_URL =
   process.env.DATABASE_URL || 'postgres://postgres@127.0.0.1:5433/costabot';
@@ -121,7 +122,8 @@ async function subirBot(modo = 'ativo', extra = {}) {
       ADMIN_TOKEN: ADMIN,
       DATABASE_URL,
       MINIMO_KG: '25',
-      LINK_MERCADO_LIVRE: LINK,
+      LINK_ML_BASTAO_11MM: L11,
+      LINK_ML_BASTAO_74MM: L74,
       DELAY_MIN_MS: '0',
       DELAY_MAX_MS: '1',
       ...extra,
@@ -206,13 +208,13 @@ async function principal() {
     assert.match(msg.texto, /Cola hot melt/);
   });
 
-  await teste('"1" pergunta a quantidade e NAO manda o Mercado Livre', async () => {
+  await teste('"1" pergunta a quantidade e NAO manda link', async () => {
     await enviarWebhook({ telefone: NOVO, texto: '1' });
     await esperarEnvio(NOVO, 2);
     const msgs = enviadasPara(NOVO);
     assert.equal(msgs.length, 2);
     assert.match(msgs[1].texto, /quantidade/i);
-    assert.ok(!msgs[1].texto.includes(LINK), 'nao pode mandar link aqui');
+    assert.ok(!msgs[1].texto.includes(L11), 'nao pode mandar link aqui');
   });
 
   await teste('quantidade acima do minimo vira lead', async () => {
@@ -230,11 +232,22 @@ async function principal() {
 
   console.log('\n-- abaixo do minimo --');
 
-  await teste('pedido pequeno recebe o link do Mercado Livre', async () => {
-    await enviarWebhook({ telefone: PEQUENO, texto: 'queria 5kg de cola hot melt' });
+  await teste('bastao pequeno recebe os dois links do Mercado Livre', async () => {
+    await enviarWebhook({ telefone: PEQUENO, texto: 'queria 5kg de bastao de cola quente' });
     await esperarEnvio(PEQUENO, 1);
     const [msg] = enviadasPara(PEQUENO);
-    assert.ok(msg.texto.includes(LINK));
+    assert.ok(msg.texto.includes(L11), 'faltou o 11mm');
+    assert.ok(msg.texto.includes(L74), 'faltou o 7,4mm');
+  });
+
+  await teste('granulado pequeno NAO recebe link de bastao', async () => {
+    const GRAN = '5511900000006';
+    await enviarWebhook({ telefone: GRAN, texto: 'queria 5kg de cola granulada' });
+    await esperarEnvio(GRAN, 1);
+    const [msg] = enviadasPara(GRAN);
+    assert.ok(!msg.texto.includes(L11), 'mandou link errado');
+    assert.ok(!msg.texto.includes(L74), 'mandou link errado');
+    assert.match(msg.texto, /atendente/i);
   });
 
   console.log('\n-- trava 3: a Eliana assume --');
@@ -278,6 +291,7 @@ async function principal() {
     const csv = await r.text();
     assert.match(csv, /lead/);
     assert.match(csv, /mercado_livre/);
+    assert.match(csv, /granulado_abaixo_minimo/);
   });
 
   await teste('rota admin sem token nao responde', async () => {

@@ -11,14 +11,31 @@ export const ESTADOS = {
   IGNORADO: 'ignorado',
 };
 
-const PALAVRAS_COLA = [
-  'cola', 'colas', 'hot melt', 'hotmelt', 'hot-melt', 'granulad', 'bastao', 'bastão',
-  'adesivo', 'pellet', 'lomba', 'termoplastic', 'silicone',
+// granulado e bastao sao produtos diferentes e seguem caminhos diferentes
+// quando a quantidade fica abaixo do minimo.
+export const INTERESSES = {
+  GRANULADO: 'granulado',
+  BASTAO: 'bastao',
+  OUTRO: 'outro',
+};
+
+const PALAVRAS_GRANULADO = [
+  'granulad', 'pellet', 'pelete', 'grão', 'grao', 'graos', 'grãos', 'escama', 'chip',
+];
+
+const PALAVRAS_BASTAO = [
+  'bastao', 'bastão', 'bastoes', 'bastões', 'refil', 'refis', 'varet', '11mm', '11 mm',
+  '7,4', '7.4', 'pistola',
+];
+
+// Fala de cola, mas nao disse qual. Precisa escolher no menu.
+const PALAVRAS_COLA_GENERICA = [
+  'cola', 'colas', 'hot melt', 'hotmelt', 'hot-melt', 'adesivo', 'termoplastic', 'lomba',
 ];
 
 const PALAVRAS_OUTRO = [
-  'outro assunto', 'outro', 'importacao', 'importação', 'exportacao', 'exportação',
-  'financeiro', 'nota fiscal', 'curriculo', 'currículo', 'parceria', 'fornecedor de',
+  'outro assunto', 'importacao', 'importação', 'exportacao', 'exportação',
+  'financeiro', 'nota fiscal', 'curriculo', 'currículo', 'parceria', 'banheiro', 'vinho',
 ];
 
 const NUMEROS_POR_EXTENSO = {
@@ -34,25 +51,38 @@ function normalizar(texto) {
     .trim();
 }
 
-// "1" e "2" sozinhos sao escolha de menu, nunca quantidade.
-// Sem isso, quem responde "1" seria lido como "1 kg" e cairia no Mercado Livre.
+// "1", "2" e "3" sozinhos sao escolha de menu, nunca quantidade.
+// Sem isso, quem responde "1" seria lido como "1 kg" e cairia no link errado.
 export function ehRespostaDeMenu(texto) {
-  return /^\s*[12]\s*[-.)]?\s*$/.test(normalizar(texto));
+  return /^\s*[123]\s*[-.)]?\s*$/.test(normalizar(texto));
 }
 
+function contem(t, lista) {
+  return lista.some((p) => t.includes(normalizar(p)));
+}
+
+/**
+ * Devolve: 'granulado' | 'bastao' | 'cola' (nao disse qual) | 'outro' | 'desconhecida'
+ */
 export function detectarIntencao(texto) {
   const t = normalizar(texto);
   if (!t) return 'desconhecida';
 
   // Resposta direta do menu
-  if (/^\s*1\s*[-.)]?\s*$/.test(t)) return 'cola';
-  if (/^\s*2\s*[-.)]?\s*$/.test(t)) return 'outro';
+  if (/^\s*1\s*[-.)]?\s*$/.test(t)) return INTERESSES.GRANULADO;
+  if (/^\s*2\s*[-.)]?\s*$/.test(t)) return INTERESSES.BASTAO;
+  if (/^\s*3\s*[-.)]?\s*$/.test(t)) return INTERESSES.OUTRO;
 
-  const temCola = PALAVRAS_COLA.some((p) => t.includes(normalizar(p)));
-  if (temCola) return 'cola';
+  const granulado = contem(t, PALAVRAS_GRANULADO);
+  const bastao = contem(t, PALAVRAS_BASTAO);
 
-  const temOutro = PALAVRAS_OUTRO.some((p) => t.includes(normalizar(p)));
-  if (temOutro) return 'outro';
+  // Citou os dois: nao da para adivinhar, manda escolher.
+  if (granulado && bastao) return 'cola';
+  if (granulado) return INTERESSES.GRANULADO;
+  if (bastao) return INTERESSES.BASTAO;
+
+  if (contem(t, PALAVRAS_COLA_GENERICA)) return 'cola';
+  if (contem(t, PALAVRAS_OUTRO)) return INTERESSES.OUTRO;
 
   return 'desconhecida';
 }
@@ -63,7 +93,6 @@ export function extrairQuantidadeKg(texto) {
   const t = normalizar(texto);
   if (!t) return null;
 
-  // Numero por extenso seguido de unidade: "uma tonelada", "meia tonelada"
   const porExtenso = t.match(
     /\b(meia|meio|uma|um|duas|dois|tres|quatro|cinco|dez|vinte|cinquenta|cem)\s+(tonelada|toneladas|ton|kg|quilo|quilos)\b/,
   );
@@ -73,17 +102,13 @@ export function extrairQuantidadeKg(texto) {
     return validar(ehTonelada ? valor * 1000 : valor);
   }
 
-  // Numero com unidade opcional. Ponto como milhar, virgula como decimal.
   const comUnidade = t.match(
     /(\d{1,3}(?:\.\d{3})+|\d+(?:[.,]\d+)?)\s*(toneladas|tonelada|ton|t|kgs|kg|quilos|quilo|k)?\b/,
   );
   if (!comUnidade) return null;
 
   let bruto = comUnidade[1];
-  // "2.000" -> 2000 ; "2,5" -> 2.5 ; "2.5" -> 2.5
-  if (/^\d{1,3}(\.\d{3})+$/.test(bruto)) {
-    bruto = bruto.replace(/\./g, '');
-  }
+  if (/^\d{1,3}(\.\d{3})+$/.test(bruto)) bruto = bruto.replace(/\./g, '');
   bruto = bruto.replace(',', '.');
 
   const valor = Number(bruto);
@@ -106,16 +131,19 @@ function validar(kg) {
  * Decide o que fazer com a mensagem recebida.
  *
  * @returns {{
- *   resposta: string|null,
- *   estado: string,
- *   interesse: string|null,
- *   tentativas: number,
- *   lead: object|null,
- *   entregarAoHumano: boolean,
- *   motivo: string
+ *   resposta: string|null, estado: string, interesse: string|null,
+ *   tentativas: number, lead: object|null, entregarAoHumano: boolean, motivo: string
  * }}
  */
-export function processar({ estado, tentativas = 0, interesse = null, texto, minimoKg, linkMercadoLivre }) {
+export function processar({
+  estado,
+  tentativas = 0,
+  interesse = null,
+  texto,
+  minimoKg,
+  linkBastao11,
+  linkBastao74,
+}) {
   const nada = {
     resposta: null,
     estado,
@@ -130,90 +158,108 @@ export function processar({ estado, tentativas = 0, interesse = null, texto, min
     return { ...nada, motivo: `estado_${estado}` };
   }
 
-  const resolverQuantidade = (kg) => {
+  const resolverQuantidade = (kg, produto) => {
     if (kg >= minimoKg) {
       return {
         resposta: textos.leadQualificado,
         estado: ESTADOS.ENCERRADO,
-        interesse: 'cola',
+        interesse: produto,
         tentativas: 0,
-        lead: { interesse: 'cola', quantidadeKg: kg, desfecho: 'lead' },
+        lead: { interesse: produto, quantidadeKg: kg, desfecho: 'lead' },
         entregarAoHumano: true,
         motivo: 'lead_qualificado',
       };
     }
+
+    // Abaixo do minimo o caminho depende do produto:
+    // bastao tem anuncio no Mercado Livre, granulado nao.
+    if (produto === INTERESSES.BASTAO) {
+      return {
+        resposta: montar(textos.bastaoAbaixoDoMinimo, {
+          link11: linkBastao11,
+          link74: linkBastao74,
+        }),
+        estado: ESTADOS.ENCERRADO,
+        interesse: produto,
+        tentativas: 0,
+        lead: { interesse: produto, quantidadeKg: kg, desfecho: 'mercado_livre' },
+        entregarAoHumano: false,
+        motivo: 'bastao_abaixo_do_minimo',
+      };
+    }
+
     return {
-      resposta: montar(textos.abaixoDoMinimo, { link: linkMercadoLivre }),
+      resposta: montar(textos.granuladoAbaixoDoMinimo, { minimo: minimoKg }),
       estado: ESTADOS.ENCERRADO,
-      interesse: 'cola',
+      interesse: produto,
       tentativas: 0,
-      lead: { interesse: 'cola', quantidadeKg: kg, desfecho: 'mercado_livre' },
-      entregarAoHumano: false,
-      motivo: 'abaixo_do_minimo',
+      lead: { interesse: produto, quantidadeKg: kg, desfecho: 'granulado_abaixo_minimo' },
+      entregarAoHumano: true,
+      motivo: 'granulado_abaixo_do_minimo',
     };
   };
+
+  const pedirQuantidade = (produto, motivo, comSaudacao = false) => ({
+    resposta: comSaudacao
+      ? `${textos.saudacao.split('\n')[0]}\n\n${textos.perguntaQuantidade}`
+      : textos.perguntaQuantidade,
+    estado: ESTADOS.AGUARDANDO_QTD,
+    interesse: produto,
+    tentativas: 0,
+    lead: null,
+    entregarAoHumano: false,
+    motivo,
+  });
+
+  const mandarMenu = (motivo) => ({
+    resposta: textos.saudacao,
+    estado: ESTADOS.AGUARDANDO_MENU,
+    interesse: null,
+    tentativas: 0,
+    lead: null,
+    entregarAoHumano: false,
+    motivo,
+  });
+
+  const ehProduto = (i) => i === INTERESSES.GRANULADO || i === INTERESSES.BASTAO;
 
   // --- primeiro contato -----------------------------------------
   if (estado === ESTADOS.NOVO) {
     const intencao = detectarIntencao(texto);
 
-    if (intencao === 'cola') {
+    if (ehProduto(intencao)) {
       const kg = ehRespostaDeMenu(texto) ? null : extrairQuantidadeKg(texto);
-      if (kg !== null) return resolverQuantidade(kg);
-
-      return {
-        resposta: `${textos.saudacao.split('\n')[0]}\n\n${textos.perguntaQuantidade}`,
-        estado: ESTADOS.AGUARDANDO_QTD,
-        interesse: 'cola',
-        tentativas: 0,
-        lead: null,
-        entregarAoHumano: false,
-        motivo: 'cola_detectada_no_primeiro_contato',
-      };
+      if (kg !== null) return resolverQuantidade(kg, intencao);
+      return pedirQuantidade(intencao, `${intencao}_detectado_no_primeiro_contato`, true);
     }
 
-    return {
-      resposta: textos.saudacao,
-      estado: ESTADOS.AGUARDANDO_MENU,
-      interesse: null,
-      tentativas: 0,
-      lead: null,
-      entregarAoHumano: false,
-      motivo: 'saudacao_com_menu',
-    };
+    // Falou de cola mas nao disse qual, ou nao deu para entender: menu.
+    return mandarMenu('saudacao_com_menu');
   }
 
   // --- esperando a escolha do menu ------------------------------
   if (estado === ESTADOS.AGUARDANDO_MENU) {
     const intencao = detectarIntencao(texto);
 
-    if (intencao === 'cola') {
+    if (ehProduto(intencao)) {
       const kg = ehRespostaDeMenu(texto) ? null : extrairQuantidadeKg(texto);
-      if (kg !== null) return resolverQuantidade(kg);
-
-      return {
-        resposta: textos.perguntaQuantidade,
-        estado: ESTADOS.AGUARDANDO_QTD,
-        interesse: 'cola',
-        tentativas: 0,
-        lead: null,
-        entregarAoHumano: false,
-        motivo: 'escolheu_cola',
-      };
+      if (kg !== null) return resolverQuantidade(kg, intencao);
+      return pedirQuantidade(intencao, `escolheu_${intencao}`);
     }
 
-    if (intencao === 'outro') {
+    if (intencao === INTERESSES.OUTRO) {
       return {
         resposta: textos.outroAssunto,
         estado: ESTADOS.ENCERRADO,
-        interesse: 'outro',
+        interesse: INTERESSES.OUTRO,
         tentativas: 0,
-        lead: { interesse: 'outro', quantidadeKg: null, desfecho: 'outro_assunto' },
+        lead: { interesse: INTERESSES.OUTRO, quantidadeKg: null, desfecho: 'outro_assunto' },
         entregarAoHumano: true,
         motivo: 'outro_assunto',
       };
     }
 
+    // 'cola' generica tambem cai aqui: precisa escolher 1 ou 2.
     const novasTentativas = tentativas + 1;
     if (novasTentativas >= 2) {
       return {
@@ -240,17 +286,18 @@ export function processar({ estado, tentativas = 0, interesse = null, texto, min
 
   // --- esperando a quantidade -----------------------------------
   if (estado === ESTADOS.AGUARDANDO_QTD) {
+    const produto = ehProduto(interesse) ? interesse : INTERESSES.GRANULADO;
     const kg = extrairQuantidadeKg(texto);
-    if (kg !== null) return resolverQuantidade(kg);
+    if (kg !== null) return resolverQuantidade(kg, produto);
 
     const novasTentativas = tentativas + 1;
     if (novasTentativas >= 2) {
       return {
         resposta: textos.desistoVaiProHumano,
         estado: ESTADOS.ENCERRADO,
-        interesse: 'cola',
+        interesse: produto,
         tentativas: novasTentativas,
-        lead: { interesse: 'cola', quantidadeKg: null, desfecho: 'humano' },
+        lead: { interesse: produto, quantidadeKg: null, desfecho: 'humano' },
         entregarAoHumano: true,
         motivo: 'nao_entendi_quantidade_2x',
       };
@@ -259,7 +306,7 @@ export function processar({ estado, tentativas = 0, interesse = null, texto, min
     return {
       resposta: textos.naoEntendiQuantidade,
       estado: ESTADOS.AGUARDANDO_QTD,
-      interesse: 'cola',
+      interesse: produto,
       tentativas: novasTentativas,
       lead: null,
       entregarAoHumano: false,

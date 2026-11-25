@@ -189,7 +189,8 @@ async function tratarEvento(corpo) {
     interesse: contato.interesse,
     texto: msg.texto,
     minimoKg: config.minimoKg,
-    linkMercadoLivre: config.linkMercadoLivre,
+    linkBastao11: config.linkBastao11,
+    linkBastao74: config.linkBastao74,
   });
 
   const vaiEnviar = !!decisao.resposta && podeEnviar(msg.telefone);

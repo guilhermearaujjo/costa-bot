@@ -55,7 +55,11 @@ export const config = {
   databaseUrl: obrigatorio('DATABASE_URL'),
 
   minimoKg: numero('MINIMO_KG', 25),
-  linkMercadoLivre: texto('LINK_MERCADO_LIVRE', ''),
+
+  // Anuncios do Mercado Livre, usados so no caminho "bastao abaixo do minimo".
+  // Nao existe anuncio de granulado: esse caminho vai para atendimento humano.
+  linkBastao11: texto('LINK_ML_BASTAO_11MM', ''),
+  linkBastao74: texto('LINK_ML_BASTAO_74MM', ''),
 
   delayMinMs: numero('DELAY_MIN_MS', 2000),
   delayMaxMs: numero('DELAY_MAX_MS', 6000),
@@ -67,8 +71,8 @@ if (config.modo === 'piloto' && config.whitelist.length === 0) {
   throw new Error('MODO=piloto exige pelo menos um numero em WHITELIST.');
 }
 
-if (config.modo === 'ativo' && !config.linkMercadoLivre) {
-  throw new Error('MODO=ativo exige LINK_MERCADO_LIVRE preenchido.');
+if (config.modo === 'ativo' && (!config.linkBastao11 || !config.linkBastao74)) {
+  throw new Error('MODO=ativo exige LINK_ML_BASTAO_11MM e LINK_ML_BASTAO_74MM preenchidos.');
 }
 
 if (config.delayMaxMs < config.delayMinMs) {

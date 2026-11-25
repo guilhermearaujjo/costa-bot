@@ -6,9 +6,10 @@ Sem LLM: é uma máquina de estados com menu numérico e palavras-chave. Respost
 ## O que ele faz
 
 - Só age em **conversa nova**. Quem já era contato antes da instalação nunca recebe mensagem.
-- Pergunta o que a pessoa precisa.
-- **Cola acima do mínimo** → confirma e avisa que um atendente vai falar. Lead registrado.
-- **Cola abaixo do mínimo** → manda o link do Mercado Livre e encerra.
+- Pergunta o que a pessoa precisa: **1** granulada, **2** bastão, **3** outro assunto.
+- **Acima do mínimo** (qualquer produto) → confirma e avisa que um atendente vai falar. Lead registrado.
+- **Bastão abaixo do mínimo** → manda os dois anúncios do Mercado Livre (11mm e 7,4mm) e encerra.
+- **Granulado abaixo do mínimo** → não existe anúncio de granulado, então vai para atendimento humano. O bot nunca manda link de bastão para quem pediu granulado.
 - **Outro assunto** → pede para aguardar e encerra.
 - **Assim que a Eliana responde**, o bot se cala naquele contato para sempre.
 - Tudo registrado por número de telefone.
@@ -51,12 +52,11 @@ Não pule etapas, principalmente a 4.
 
 ## Variáveis de ambiente
 
-Estão todas documentadas em `.env.example`. As duas que ainda dependem do cliente:
+Estão todas documentadas em `.env.example`. A que ainda depende do cliente:
 
-- `MINIMO_KG` — quantidade que separa lead de Mercado Livre.
-- `LINK_MERCADO_LIVRE` — link do anúncio.
+- `MINIMO_KG` — quantidade que separa lead de varejo.
 
-O serviço se recusa a subir em `MODO=ativo` sem o link preenchido.
+Os anúncios do Mercado Livre são `LINK_ML_BASTAO_11MM` e `LINK_ML_BASTAO_74MM`. O serviço se recusa a subir em `MODO=ativo` sem os dois preenchidos.
 
 ## Rotas
 
